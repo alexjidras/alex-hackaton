@@ -82,42 +82,22 @@ Question: How can I tell if a family member accepted the invite I sent?
 Answer: At the top of the dashboard, you will see a link labeled “Intelligence” please click that link. You will now be brought to all of our reports. There is a heading labeled “Family” Here you can find all the reports for Family Engagement. The first one is the Family Invite Report. This report will show you the date the family member signed up. You can also do a quick check by going to the resident’s profile -> authorized contacts -> and if that family member has a green check mark by their name they have successfully created an account. 
 `};
 
-exports.handler = async (event, context) => {
-  if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405
-    }
-  }
+exports.handler = async (req, res) => {
+  const { message } = req.body;
 
-  const username = event.headers['x-username'];
-
-  if (!username) {
-      return {
-          statusCode: 401,
-          body: JSON.stringify({ message: 'You are not logged in'})
-      }
-  }
-
-  let message;
-
-  try {
-    message = JSON.parse(event.body).message;
-  } catch (err) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Bad input'})
-    }
+  if (!message) {
+    return res.status(400).json({ message: 'Bad input'})
   }
   
   const userMessage = {role: "user", content: message};
-  const existingMessages = cache.getMessages(username);
+  const existingMessages = cache.getMessages(req.username);
   const addedMessages = [];
   
   if (!existingMessages.length) {
-    cache.addMessage(username, systemMessage, userMessage);
+    cache.addMessage(req.username, systemMessage, userMessage);
     addedMessages.push(systemMessage, userMessage);
   } else {
-    cache.addMessage(username, userMessage);
+    cache.addMessage(req.username, userMessage);
     addedMessages.push(userMessage);
   }
 
@@ -129,34 +109,29 @@ exports.handler = async (event, context) => {
         ...addedMessages
       ],
       temperature: 0,
+      user: req.username
     });
 
     console.info('Tokens used: ', response.data.usage.total_tokens);
 
     const assistantMessage = response.data.choices[0].message;
 
-    cache.addMessage(username, assistantMessage);
+    cache.addMessage(req.username, assistantMessage);
     addedMessages.push(assistantMessage);
     
-    console.log('existing>', existingMessages, 'addedMessages>', addedMessages, 'assistantMessage>', assistantMessage)
-    
-    return {
-      statusCode: 200,
-      body: JSON.stringify([
+    return res.status(200).json([
         ...existingMessages,
         ...addedMessages
-      ].slice(1)),
-    };
+      ].slice(1))
+    
   } catch(error) {
     if (error.response) {
       console.error(error.response.status, error.response.data);
     } else {
       console.error(`Error with OpenAI API request: ${error.message}`);
     }
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'An error occurred during your request.' }),
-    };
+    return res.status(500).json({ message: 'An error occurred during your request.' })
+
   }
 }
 
