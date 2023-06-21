@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+var cors = require('cors');
 const { handler: getMessages } = require('./netlify/functions/getMessages');
 const { handler: sendMessage } = require('./netlify/functions/sendMessage');
 const { handler: removeMessages } = require('./netlify/functions/removeMessages');
@@ -18,6 +19,7 @@ const authMiddleware = (req, res, next) => {
     next();
 }
 
+app.use(cors());
 app.use(express.json());
 app.use(authMiddleware);
 
